@@ -14,31 +14,16 @@ import {
   Trash2
 } from "lucide-react";
 import AddHolidayModal from "../components/AddHolidayModal";
+import SkeletonLoader from "../components/SkeletonLoader";
+import FetchErrorState from "../components/FetchErrorState";
 import "../styles/Holidays.css";
 import API from "../api/api"; // Import the API instance for making requests
-
-/**
- * =========================================================================
- * HOLIDAYS VIEW (FRONTEND ONLY)
- * 
- * Ready for your backend implementation!
- * You can implement and connect the endpoints whenever you are ready:
- * 
- * 1. Fetch holidays on mount:
- *    GET http://localhost:8000/holiday
- * 
- * 2. Add a new holiday:
- *    POST http://localhost:8000/holiday
- *    Body: { Name, Date, Day, Type }
- * 
- * 3. Delete a holiday:
- *    DELETE http://localhost:8000/holiday/:id
- * =========================================================================
- */
 
 export default function Holidays() {
   // Pure frontend state - starts empty
   const [holidays, setHolidays] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedYear, setSelectedYear] = useState("All");
@@ -50,14 +35,20 @@ export default function Holidays() {
 const user = JSON.parse(localStorage.getItem("user"));
   //getholidays
   const fetchHolidays = async () => {
+  setIsLoading(true);
+  setError(null);
   try {
-    const response = await API.get("/holiday");
+    const response = await API.get("/holiday", { timeout: 15000 });
 
     console.log("Holidays are:", response.data.data);
 
-    setHolidays(response.data.data);
+    setHolidays(response.data.data || []);
+    setError(null);
   } catch (error) {
     console.error("Error fetching holidays:", error);
+    setError("Can't fetch Holidays");
+  } finally {
+    setIsLoading(false);
   }
 };
 
@@ -383,8 +374,17 @@ const handleUpdateHoliday = async (holidayId, updatedData) => {
         </div>
       </div>
 
-      {/* Main Content: Card Grid View or Table View */}
-      {viewMode === "grid" ? (
+      {/* Main Content: Error / Skeleton / Card Grid / Table View */}
+      {error ? (
+        <FetchErrorState 
+          title={error}
+          message="Could not fetch holiday records from server. The request timed out (15s limit) or the server is starting up."
+          onRetry={fetchHolidays}
+          isRetrying={isLoading}
+        />
+      ) : isLoading && holidays.length === 0 ? (
+        <SkeletonLoader count={6} />
+      ) : viewMode === "grid" ? (
         <div className="holidays-cards-grid">
           {filteredHolidays.length === 0 ? (
             <div className="empty-holidays-box">
