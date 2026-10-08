@@ -54,10 +54,47 @@ export default function TopBar({
     };
 
     fetchNotifications();
+
+    // Poll every 30s to receive new notifications automatically
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
   }, []);
 
-  const notifCount = notifications.length;
-  const displayCount = notifCount > 99 ? "99+" : notifCount;
+  // Only count UNREAD notifications for the badge
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  const displayCount = unreadCount > 99 ? "99+" : unreadCount;
+
+  // Toggle dropdown and mark all notifications as read when opening
+  const handleToggleNotif = async () => {
+    const willOpen = !showNotif;
+    setShowNotif(willOpen);
+
+    if (willOpen && unreadCount > 0) {
+      // 1. Immediately clear badge in UI
+      setNotifications((prev) =>
+        prev.map((notif) => ({ ...notif, read: true }))
+      );
+
+      // 2. Persist in database
+      try {
+        await API.put("/notification/read-all");
+      } catch (error) {
+        console.error("Error marking all notifications as read:", error);
+      }
+    }
+  };
+
+  // Mark single notification as read if clicked
+  const handleMarkOneAsRead = async (notifId) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n._id === notifId ? { ...n, read: true } : n))
+    );
+    try {
+      await API.put(`/notification/${notifId}/read`);
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+    }
+  };
 
   const initials = currentUser
     ? `${currentUser.firstName?.[0] || ""}${currentUser.lastName?.[0] || ""}`
@@ -98,13 +135,14 @@ export default function TopBar({
           <button
             type="button"
             className={`bell-icon-wrapper ${showNotif ? "active" : ""}`}
-            onClick={() => setShowNotif(!showNotif)}
+            onClick={handleToggleNotif}
             aria-label="View notifications"
             title="Notifications"
           >
             <Bell size={20} />
 
-            {notifCount > 0 && (
+            {/* Badge shows ONLY when there are unread notifications */}
+            {unreadCount > 0 && (
               <span className="bell-badge">
                 {displayCount}
               </span>
@@ -118,26 +156,31 @@ export default function TopBar({
               <div className="notif-header">
                 <div className="notif-header-title">
                   <span>Notifications</span>
-                  {notifCount > 0 && (
-                    <span className="notif-count-chip">{notifCount} New</span>
-                  )}
+                  {unreadCount > 0 ? (
+                    <span className="notif-count-chip">{unreadCount} New</span>
+                  ) : notifications.length > 0 ? (
+                    <span className="notif-count-chip" style={{ background: "rgba(0,0,0,0.05)", color: "var(--text-secondary)" }}>
+                      {notifications.length} Total
+                    </span>
+                  ) : null}
                 </div>
               </div>
 
               <div className="notif-list-container">
-                {notifCount === 0 ? (
+                {notifications.length === 0 ? (
                   <div className="notif-empty-state">
                     <div className="notif-empty-icon">
                       <CheckCircle2 size={24} />
                     </div>
                     <span className="notif-empty-title">All caught up!</span>
-                    <span className="notif-empty-desc">No new notifications at this time.</span>
+                    <span className="notif-empty-desc">No notifications at this time.</span>
                   </div>
                 ) : (
                   notifications.map((notification, idx) => (
                     <div
-                      className="notif-item"
+                      className={`notif-item ${notification.read ? "read" : "unread"}`}
                       key={notification._id || idx}
+                      onClick={() => !notification.read && handleMarkOneAsRead(notification._id)}
                     >
                       <div className="notif-item-icon">
                         <MessageSquare size={14} />
@@ -155,6 +198,9 @@ export default function TopBar({
                           </span>
                         </span>
                       </div>
+                      {!notification.read && (
+                        <span className="notif-unread-dot" title="Unread" />
+                      )}
                     </div>
                   ))
                 )}

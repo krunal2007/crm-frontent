@@ -32,7 +32,15 @@ export default function Holidays() {
   const [holidayToEdit, setHolidayToEdit] = useState(null);
 
 
-const user = JSON.parse(localStorage.getItem("user"));
+  const rawUser = localStorage.getItem("user");
+  let user = null;
+  try {
+    const parsed = rawUser ? JSON.parse(rawUser) : null;
+    user = parsed?.user || parsed;
+  } catch {
+    user = null;
+  }
+  const isAdmin = user?.role?.toLowerCase() === "admin";
   //getholidays
   const fetchHolidays = async () => {
   setIsLoading(true);
@@ -248,7 +256,7 @@ const handleUpdateHoliday = async (holidayId, updatedData) => {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-         { user?.role === "admin" && (
+         { isAdmin && (
             <button 
               type="button"
               className="btn-add-holiday-primary"
@@ -395,17 +403,17 @@ const handleUpdateHoliday = async (holidayId, updatedData) => {
               <div className="empty-holidays-sub">
                 Click "Add Holiday" above to schedule a new holiday for your team.
               </div>
-                          {user?.role === "admin" && (
-                    <button
-                      type="button"
-                      className="btn-add-holiday-primary"
-                      style={{ marginTop: "12px" }}
-                      onClick={() => setShowAddModal(true)}
-                    >
-                      <Plus size={15} />
-                      <span>Add First Holiday</span>
-                    </button>
-                  )}
+            {isAdmin && (
+              <button
+                type="button"
+                className="btn-add-holiday-primary"
+                style={{ marginTop: "12px" }}
+                onClick={() => setShowAddModal(true)}
+              >
+                <Plus size={15} />
+                <span>Add First Holiday</span>
+              </button>
+            )}
             </div>
           ) : (
             filteredHolidays.map((item) => {
@@ -413,16 +421,17 @@ const handleUpdateHoliday = async (holidayId, updatedData) => {
               const status = getHolidayStatus(item.Date);
 
               return (
-                                        <div
-                          key={item._id}
-                          className="holiday-card"
-                          onClick={() => {
-                            if (user?.role === "admin") {
-                              setHolidayToEdit(item);
-                              setShowAddModal(true);
-                            } 
-                          }}
-                        >
+                <div
+                  key={item._id}
+                  className="holiday-card"
+                  style={{ cursor: isAdmin ? "pointer" : "default" }}
+                  onClick={() => {
+                    if (isAdmin) {
+                      setHolidayToEdit(item);
+                      setShowAddModal(true);
+                    } 
+                  }}
+                >
                   
                   <div className="holiday-card-top">
                     {/* Date Block */}
@@ -441,18 +450,20 @@ const handleUpdateHoliday = async (holidayId, updatedData) => {
                           <span>{formatDate(item.Date)}</span>
                         </div>
 
-                        {/* Delete button */}
-                        <button
-                          type="button"
-                          className="btn-holiday-delete"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteHoliday(item._id);
-                                  }}
-                          title="Delete Holiday"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        {/* Delete button (Admin only) */}
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            className="btn-holiday-delete"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteHoliday(item._id);
+                            }}
+                            title="Delete Holiday"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </div>
 
                       <h3 className="holiday-name">{item.Name}</h3>
@@ -496,14 +507,23 @@ const handleUpdateHoliday = async (holidayId, updatedData) => {
                   <th>Holiday Name</th>
                   <th>Type</th>
                   <th>Status</th>
-                  <th style={{ textAlign: "right" }}>Action</th>
+                  {isAdmin && <th style={{ textAlign: "right" }}>Action</th>}
                 </tr>
               </thead>
               <tbody>
                 {filteredHolidays.map((item) => {
                   const status = getHolidayStatus(item.Date);
                   return (
-                    <tr key={item._id}>
+                    <tr 
+                      key={item._id}
+                      style={{ cursor: isAdmin ? "pointer" : "default" }}
+                      onClick={() => {
+                        if (isAdmin) {
+                          setHolidayToEdit(item);
+                          setShowAddModal(true);
+                        }
+                      }}
+                    >
                       <td style={{ fontWeight: 600 }}>
                         {formatDate(item.Date)}
                       </td>
@@ -524,19 +544,21 @@ const handleUpdateHoliday = async (holidayId, updatedData) => {
                           <span>{status.label}</span>
                         </span>
                       </td>
-                      <td style={{ textAlign: "right" }}>
-                      {user?.role === "admin" && (
-                            <button
-                              type="button"
-                              className="btn-add-holiday-primary"
-                              style={{ marginTop: "12px" }}
-                              onClick={() => setShowAddModal(true)}
-                            >
-                              <Plus size={15} />
-                              <span>Add First Holiday</span>
-                            </button>
-                          )}
-                      </td>
+                      {isAdmin && (
+                        <td style={{ textAlign: "right" }}>
+                          <button
+                            type="button"
+                            className="btn-holiday-delete"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteHoliday(item._id);
+                            }}
+                            title="Delete Holiday"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
